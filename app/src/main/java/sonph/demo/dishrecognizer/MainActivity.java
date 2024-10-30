@@ -1,23 +1,16 @@
 package sonph.demo.dishrecognizer;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.text.SpannableString;
-import android.text.SpannableStringBuilder;
-import android.text.style.RelativeSizeSpan;
-import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,34 +25,31 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.firebase.crashlytics.buildtools.reloc.org.apache.commons.io.IOUtils;
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.snackbar.Snackbar;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.concurrent.TimeUnit;
-import okhttp3.*;
-import org.json.JSONException;
-import org.json.JSONObject;
 
-import sonph.demo.dishrecognizer.network.RecipeService;
-import sonph.demo.dishrecognizer.utils.ImageUtils;
-import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.snackbar.Snackbar;
 import io.noties.markwon.Markwon;
 import io.noties.markwon.ext.strikethrough.StrikethroughPlugin;
-import io.noties.markwon.linkify.LinkifyPlugin;
 import io.noties.markwon.image.ImagesPlugin;
+import io.noties.markwon.linkify.LinkifyPlugin;
+import sonph.demo.dishrecognizer.network.RecipeService;
+import sonph.demo.dishrecognizer.utils.ImageUtils;
 
 public class MainActivity extends AppCompatActivity {
     static final int REQUEST_IMAGE_CAPTURE = 1;
     private static final int REQUEST_CAMERA_PERMISSION = 200;
-    private static final String SERVER_URL = "http://192.168.0.138:8000/get_recipe";
+
     private Uri photoURI;
     private RecipeService recipeService;
     private MaterialCardView imagePreviewCard;
@@ -102,9 +92,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendImageToServer(Uri imageUri) {
-        loadingContainer.setVisibility(View.VISIBLE);
-        recipeCard.setVisibility(View.GONE);
-
+        showLoading();
+        imagePreviewCard.setAlpha(0.5f); // Dim the image while processing
+        
         new Thread(() -> {
             try {
                 byte[] resizedImageBytes = ImageUtils.getResizedImageBytes(this, imageUri);
@@ -113,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(String response) {
                         runOnUiThread(() -> {
-                            loadingContainer.setVisibility(View.GONE);
+                            hideLoading();
                             parseRecipeResponse(response);
                         });
                     }
@@ -121,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onFailure(Exception e) {
                         runOnUiThread(() -> {
-                            loadingContainer.setVisibility(View.GONE);
+                            hideLoading();
                             recipeCard.setVisibility(View.VISIBLE);
                             String errorMessage = "Error: " + e.getMessage();
                             Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_LONG).show();
@@ -132,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 Log.e("MainActivity", "Error preparing image", e);
                 runOnUiThread(() -> {
-                    loadingContainer.setVisibility(View.GONE);
+                    hideLoading();
                     String errorMessage = "Error preparing image: " + e.getMessage();
                     Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_LONG).show();
                     displayRecipe(errorMessage);
@@ -188,12 +178,15 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        // Handle the camera result
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
+            // Make the preview card visible
+            imagePreviewCard.setVisibility(View.VISIBLE);
+            
             // Display the image
             ImageView imageView = findViewById(R.id.imagePreview);
             imageView.setImageURI(photoURI);
+            
             // Send the image to the backend server
             sendImageToServer(photoURI);
         }
@@ -286,5 +279,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void hideLoading() {
         loadingContainer.setVisibility(View.GONE);
+        imagePreviewCard.setAlpha(1.0f); // Restore image opacity
+    }
+
+    private void displayImage(Uri imageUri) {
+        try {
+            ImageView imageView = findViewById(R.id.imagePreview);
+            imageView.setImageURI(null); // Clear the previous image
+            imageView.setImageURI(imageUri);
+            imagePreviewCard.setVisibility(View.VISIBLE);
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error displaying image", e);
+            Toast.makeText(this, "Error displaying image", Toast.LENGTH_SHORT).show();
+        }
     }
 }

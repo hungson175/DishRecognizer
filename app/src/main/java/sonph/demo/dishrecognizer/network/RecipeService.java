@@ -17,7 +17,9 @@ import okhttp3.Response;
 
 public class RecipeService {
     private static final String TAG = "RecipeService";
-    private static final String SERVER_URL = "http://192.168.0.138:8000/get_recipe";
+    static final String BASE_URL = "https://dish-backend-wlsl.onrender.com";
+//
+//    private static final String SERVER_URL = "http://192.168.0.138:8000/get_recipe";
     
     private final OkHttpClient client;
 
@@ -37,7 +39,7 @@ public class RecipeService {
                 .build();
 
         Request request = new Request.Builder()
-                .url(SERVER_URL)
+                .url(BASE_URL+"/get_recipe")
                 .post(requestBody)
                 .build();
 
