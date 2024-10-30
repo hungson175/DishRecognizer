@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">DishRecognizer</string>
+    <string name="capture_dish">Capture Dish</string>
+    <string name="recipe_will_appear_here">Recipe will appear here</string>
+</resources>
