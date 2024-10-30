@@ -30,34 +30,30 @@ public class RecipeService {
     }
 
     public void sendImageForRecipe(byte[] imageBytes, RecipeCallback callback) {
-        RequestBody formBody = new MultipartBody.Builder()
+        RequestBody requestBody = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-                .addFormDataPart("image", "dish.jpg",
+                .addFormDataPart("image", "image.jpg",
                         RequestBody.create(MediaType.parse("image/jpeg"), imageBytes))
-                .addFormDataPart("message", "Describe this dish and provide the ingredients and recipe.")
                 .build();
 
         Request request = new Request.Builder()
                 .url(SERVER_URL)
-                .post(formBody)
+                .post(requestBody)
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                Log.e(TAG, "Network error", e);
                 callback.onFailure(e);
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                String responseBody = response.body().string();
-                Log.d(TAG, "Server response: " + responseBody);
-                
                 if (response.isSuccessful()) {
+                    String responseBody = response.body().string();
                     callback.onSuccess(responseBody);
                 } else {
-                    callback.onFailure(new IOException("Server error: " + response.code()));
+                    callback.onFailure(new IOException("Unexpected response " + response));
                 }
             }
         });

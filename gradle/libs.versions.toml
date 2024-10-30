@@ -1,6 +1,7 @@
 [versions]
 agp = "8.7.0"
 commonsIo = "2.8.0"
+core = "4.6.2"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
@@ -14,6 +15,7 @@ okhttp = "4.9.0"
 
 [libraries]
 commons-io = { module = "commons-io:commons-io", version.ref = "commonsIo" }
+core = { module = "io.noties.markwon:core", version.ref = "core" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

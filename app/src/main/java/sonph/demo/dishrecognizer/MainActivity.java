@@ -15,6 +15,7 @@ import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -30,6 +31,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.firebase.crashlytics.buildtools.reloc.org.apache.commons.io.IOUtils;
 
 import java.io.File;
@@ -47,6 +49,12 @@ import org.json.JSONObject;
 
 import sonph.demo.dishrecognizer.network.RecipeService;
 import sonph.demo.dishrecognizer.utils.ImageUtils;
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.snackbar.Snackbar;
+import io.noties.markwon.Markwon;
+import io.noties.markwon.ext.strikethrough.StrikethroughPlugin;
+import io.noties.markwon.linkify.LinkifyPlugin;
+import io.noties.markwon.image.ImagesPlugin;
 
 public class MainActivity extends AppCompatActivity {
     static final int REQUEST_IMAGE_CAPTURE = 1;
@@ -54,6 +62,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String SERVER_URL = "http://192.168.0.138:8000/get_recipe";
     private Uri photoURI;
     private RecipeService recipeService;
+    private MaterialCardView imagePreviewCard;
+    private MaterialCardView recipeCard;
+    private FrameLayout loadingContainer;
+    private Markwon markwon;
 
     private void dispatchTakePictureIntent() {
         Log.d("MainActivity", "dispatchTakePictureIntent");
@@ -90,8 +102,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendImageToServer(Uri imageUri) {
-        findViewById(R.id.loadingProgressBar).setVisibility(View.VISIBLE);
-        findViewById(R.id.recipeTextView).setVisibility(View.GONE);
+        loadingContainer.setVisibility(View.VISIBLE);
+        recipeCard.setVisibility(View.GONE);
 
         new Thread(() -> {
             try {
@@ -101,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(String response) {
                         runOnUiThread(() -> {
-                            findViewById(R.id.loadingProgressBar).setVisibility(View.GONE);
+                            loadingContainer.setVisibility(View.GONE);
                             parseRecipeResponse(response);
                         });
                     }
@@ -109,8 +121,8 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onFailure(Exception e) {
                         runOnUiThread(() -> {
-                            findViewById(R.id.loadingProgressBar).setVisibility(View.GONE);
-                            findViewById(R.id.recipeTextView).setVisibility(View.VISIBLE);
+                            loadingContainer.setVisibility(View.GONE);
+                            recipeCard.setVisibility(View.VISIBLE);
                             String errorMessage = "Error: " + e.getMessage();
                             Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_LONG).show();
                             displayRecipe(errorMessage);
@@ -120,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 Log.e("MainActivity", "Error preparing image", e);
                 runOnUiThread(() -> {
-                    findViewById(R.id.loadingProgressBar).setVisibility(View.GONE);
+                    loadingContainer.setVisibility(View.GONE);
                     String errorMessage = "Error preparing image: " + e.getMessage();
                     Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_LONG).show();
                     displayRecipe(errorMessage);
@@ -149,9 +161,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void displayRecipe(String recipe) {
-        TextView recipeTextView = findViewById(R.id.recipeTextView);
-        recipeTextView.setVisibility(View.VISIBLE);
-        recipeTextView.setText(recipe);
+        hideLoading();
+        recipeCard.setVisibility(View.VISIBLE);
+        
+        // Get reference to TextView
+        TextView recipeContent = findViewById(R.id.recipeContent);
+        
+        // Set markdown text
+        markwon.setMarkdown(recipeContent, recipe);
     }
 
     private File createImageFile() throws IOException {
@@ -175,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
             // Display the image
-            ImageView imageView = findViewById(R.id.imageView);
+            ImageView imageView = findViewById(R.id.imagePreview);
             imageView.setImageURI(photoURI);
             // Send the image to the backend server
             sendImageToServer(photoURI);
@@ -209,13 +226,25 @@ public class MainActivity extends AppCompatActivity {
         // Initialize RecipeService
         recipeService = new RecipeService();
         
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+        // Initialize views
+        imagePreviewCard = findViewById(R.id.imagePreviewCard);
+        recipeCard = findViewById(R.id.recipeCard);
+        loadingContainer = findViewById(R.id.loadingContainer);
+
+        // Initialize Markwon with plugins
+        markwon = Markwon.builder(this)
+                .usePlugin(StrikethroughPlugin.create())
+                .usePlugin(LinkifyPlugin.create())
+                .usePlugin(ImagesPlugin.create())
+                .build();
+
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-        Button captureButton = findViewById(R.id.captureButton);
-        captureButton.setOnClickListener(v -> {
+        MaterialButton buttonCamera = findViewById(R.id.buttonCamera);
+        buttonCamera.setOnClickListener(v -> {
             Log.d("MainActivity", "Capture button clicked");
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                     != PackageManager.PERMISSION_GRANTED) {
@@ -239,5 +268,23 @@ public class MainActivity extends AppCompatActivity {
                 Log.e("MainActivity", "Server is not reachable: " + e.getMessage());
             }
         }).start();
+    }
+
+    private void showError(String message) {
+        loadingContainer.setVisibility(View.GONE);
+        Snackbar.make(findViewById(android.R.id.content), message, Snackbar.LENGTH_LONG)
+            .setAction("Retry", v -> {
+                // Implement retry logic here
+            })
+            .show();
+    }
+
+    private void showLoading() {
+        loadingContainer.setVisibility(View.VISIBLE);
+        recipeCard.setVisibility(View.GONE);
+    }
+
+    private void hideLoading() {
+        loadingContainer.setVisibility(View.GONE);
     }
 }
